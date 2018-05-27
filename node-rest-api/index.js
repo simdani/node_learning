@@ -1,9 +1,24 @@
+const helmet = require('helmet');
+const morgan = require('morgan');
 const express = require('express');
 const Joi = require('joi');
+const logger = require('./logger');
 
 const app = express();
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // key=vaue&key=value adds payloads
+app.use(express.static('public')); // use static assets (we can serve static content)
+app.use(helmet);
+app.use(morgan('tiny')); // for logging requests
+
+// midleware function are called in sequence
+app.use(logger);
+
+app.use(function(req, res, next) {
+  console.log('Authenticating...');
+  next();
+});
 
 const courses = [
   { id: 1, name: 'course1'},
