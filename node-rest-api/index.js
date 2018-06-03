@@ -1,3 +1,6 @@
+const config = require('config');
+const startupDebugger = require('debug')('app:startup');
+const dbDebugger = require('debug')('app:db');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const express = require('express');
@@ -10,7 +13,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // key=vaue&key=value adds payloads
 app.use(express.static('public')); // use static assets (we can serve static content)
 app.use(helmet);
-app.use(morgan('tiny')); // for logging requests
+
+// configuration
+console.log('Application name: ' + config.get('name'));
+console.log('mail server: ' + config.get('mail.host'));
+console.log('mail password: ' + config.get('mail.password'));
+
+
+// export DEBUG=app:* // for debugging
+if (app.get('env') === 'development') {
+  app.use(morgan('tiny')); // for logging requests
+  startupDebugger('morgan is enabled');
+}
+
 
 // midleware function are called in sequence
 app.use(logger);
