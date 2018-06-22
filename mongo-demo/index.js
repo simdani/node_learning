@@ -5,14 +5,30 @@ mongoose.connect('mongodb://testas:testas1@ds247310.mlab.com:47310/node-api-test
   .catch(err => console.log('could not connect to mongodb...', err));
 
 const courseSchema = new mongoose.Schema({
-  name: String,
+  name: {
+    type: String, 
+    required: true,
+    minlength: 5,
+    maxlength: 255
+  },
+  category: {
+    type: String,
+    enum: ['web', 'mobile', 'network'], // should be one of those values
+    required: true
+  },
   author: String,
   tags:[ String ],
   date: { 
     type: Date, 
     default: Date.now
   },
-  isPublished: Boolean
+  isPublished: Boolean,
+  price: {
+    type: Number,
+    required: function() { return this.isPublished },
+    min: 10,
+    max: 200
+  }
 });
 
 const Course = mongoose.model('Course', courseSchema);
@@ -20,13 +36,20 @@ const Course = mongoose.model('Course', courseSchema);
 async function createCourse() {
   const course = new Course({
     name: 'Angular course',
+    category: '-',
     author: 'Sim',
     tags: ['angular', 'frontend'],
-    isPublished: true
+    isPublished: true,
+    price: 15
   });
 
-  const result = await course.save();
-  console.log(result);
+  try {
+    const result = await course.save();
+    console.log(result);
+  }
+  catch (ex) {
+    console.log(ex.message);
+  }
 }
 
 async function getCourses() {
@@ -99,3 +122,5 @@ async function removeCourse(id) {
   const result = Course.deleteOne({ _id: id });
   console.log(result);
 }
+
+createCourse();
