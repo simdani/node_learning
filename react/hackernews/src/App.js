@@ -1,27 +1,53 @@
 import React, { Component } from 'react';
 import './App.css';
+import axios from 'axios';
+import PropTypes from 'prop-types';
+import { sortBy } from 'lodash';
 
 import Search from './Componenets/Search';
 import Table from './Componenets/Table';
 import Button from './Componenets/Button';
 
-const DEFAULT_QUERY = 'redux';
-const DEFAULT_HPP = '100';
+import {
+  DEFAULT_QUERY,
+  DEFAULT_HPP,
+  PATH_BASE,
+  PATH_SEARCH,
+  PARAM_SEARCH,
+  PARAM_PAGE,
+  PARAM_HPP,
+} from './Constants/index';
 
-const PATH_BASE = 'https://hn.algolia.com/api/v1';
-const PATH_SEARCH = '/search';
-const PARAM_SEARCH = 'query=';
-const PARAM_PAGE = 'page=';
-const PARAM_HPP = 'hitsPerPage='
+const Loading = () => <div>Loading ...</div>
+
+const withLoading = (Component) => ({ isLoading, ...rest }) =>
+  isLoading
+    ? <Loading />
+    : <Component { ...rest} />
+
+const ButtonWithLoading = withLoading(Button);
+
+const SORTS = {
+  NONE: list => list,
+  TITLE: list => sortBy(list, 'title'),
+  AUTHOR: list => sortBy(list, 'author'),
+  COMMENTS: list => sortBy(list, 'num_comments').reverse(),
+  POINTS: list => sortBy(list, 'points').reverse()
+};
 
 class App extends Component {
+  _isMounted = false;
+
   constructor(props) {
     super(props);
 
     this.state = {
       results: null,
       searchKey: '',
-      searchTerm: DEFAULT_QUERY
+      searchTerm: DEFAULT_QUERY,
+      error: null,
+      isLoading: false,
+      sortKey: 'NONE'
     }
   }
 
@@ -34,16 +60,21 @@ class App extends Component {
       : [];
 
     const updatedHits = [
-      oldHits,
-      hits
+      ...oldHits,
+      ...hits
     ];
 
     this.setState({
       results: { 
         ...results,
         [searchKey]: { hits: updatedHits, page }
-      }
+      },
+      isLoading: false
     });
+  }
+
+  onSort = sortKey => {
+    this.setState({ sortKey });
   }
 
   onSearchSubmit = (event) => {
@@ -61,11 +92,11 @@ class App extends Component {
   }
 
   fetchSearchTopStories = (searchTerm, page = 0) => {
-    fetch(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}
+    this.setState({ isLoading: true });
+    axios(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}
     &${PARAM_PAGE}${page}&${PARAM_HPP}${DEFAULT_HPP}`)
-      .then(response => response.json())
-      .then(result => this.setSearchTopStories(result))
-      .catch(error => error);    
+      .then(result => this._isMounted && this.setSearchTopStories(result.data))
+      .catch(error => this._isMounted && this.setState({ error }));    
   }
 
   onDismiss = id => {
@@ -86,16 +117,25 @@ class App extends Component {
   }
 
   componentDidMount() {
+    this._isMounted = true;
+
     const { searchTerm } = this.state;
     this.setState({ searchKey: searchTerm });
     this.fetchSearchTopStories(searchTerm);
+  }
+
+  componentWillUnmount() {
+    this._isMounted = false;
   }
 
   render() {
     const {
       searchTerm,
       results,
-      searchKey
+      searchKey,
+      error,
+      isLoading,
+      sortKey
     } = this.state;
 
     const page = (
@@ -120,18 +160,63 @@ class App extends Component {
             Search
           </Search>
         </div>
+        { error 
+          ? <div className="interactions">
+            <p>Something went wrong.</p>
+          </div>
+          :
           <Table 
             list={list}
+            sortKey={sortKey}
+            onSort={this.onSort}
             onDismiss={this.onDismiss}
           />
+        }
         <div className="interactions">
-          <Button onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}>
+          <ButtonWithLoading
+            isLoading={isLoading}
+            onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}>
             More
-          </Button>
+          </ButtonWithLoading>
         </div>
       </div>
     );
   }
 }
 
+const Button = ({
+  onClick,
+  className = '',
+  children
+}) => <button onClick={onClick} className={className} type="button">children</button>
+
+Button.defaultProps = {
+  className: ''
+};
+
+Button.propTypes = {
+  onClick: PropTypes.func.isRequired,
+  className: PropTypes.string,
+  children: PropTypes.node.isRequired
+};
+
+Table.propTypes = {
+  list: PropTypes.arrayOf(
+    PropTypes.shape({
+      objectID: PropTypes.string.isRequired,
+      author: PropTypes.string,
+      url: PropTypes.string,
+      num_comments: PropTypes.number,
+      points: PropTypes.number
+    })
+  ).isRequired,
+  onDismiss: PropTypes.func.isRequired
+};
+
 export default App;
+
+export {
+  Button,
+  Search,
+  Table
+};
